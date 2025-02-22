@@ -1,0 +1,209 @@
+# This is the OpenAPI specification for your service. It is used to generate the client code.
+# To generate the server code, use the Gradle task `openApiGenerate`. The 
+# generated code will be placed in `build/generate-resources/main`.
+#
+# We will evaluate you based on how well you design your API.
+# 1. How well it follows REST principles.
+# 2. How easy it is to understand and use.
+#
+# References
+# 1. https://swagger.io/specification/
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Plantation Management API
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+paths:
+  /estate:
+    post:
+      summary: Create a new estate
+      description: Create a new estate with the given width and length.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEstateRequest'
+      responses:
+        '201':
+          description: Estate created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateEstateResponse'
+        '400':
+          description: Invalid input
+  /estate/{id}/tree:
+    post:
+      summary: Add a tree to an estate
+      description: Add a tree to the estate with the given ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTreeRequest'
+      responses:
+        '201':
+          description: Tree added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddTreeResponse'
+        '400':
+          description: Invalid input
+        '404':
+          description: Estate not found
+  /estate/{id}/stats:
+    get:
+      summary: Get estate statistics
+      description: Get statistics about the trees in the estate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstateStats'
+        '404':
+          description: Estate not found
+  /estate/{id}/drone-plan:
+    get:
+      summary: Get drone travel plan
+      description: Calculate the total distance the drone will travel to monitor the estate.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: max_distance
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            description: Maximum distance the drone can travel before landing (in meters)
+            x-oapi-codegen-extra-tags:
+              validate: "omitempty,min=1"
+              form: "max_distance"
+      responses:
+        '200':
+          description: Drone plan calculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DronePlanResponse'
+        '404':
+          description: Estate not found
+components:
+  schemas:
+    CreateEstateRequest:
+      type: object
+      properties:
+        width:
+          type: integer
+          minimum: 1
+          maximum: 50000
+          description: Width of the estate in 10-meter plots
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=50000"
+        length:
+          type: integer
+          minimum: 1
+          maximum: 50000
+          description: Length of the estate in 10-meter plots
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=50000"
+      required:
+        - width
+        - length
+    CreateEstateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the created estate
+    AddTreeRequest:
+      type: object
+      properties:
+        x:
+          type: integer
+          minimum: 1
+          description: X coordinate of the tree (West-East axis)
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=50000"
+        y:
+          type: integer
+          minimum: 1
+          description: Y coordinate of the tree (South-North axis)
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=50000"
+        height:
+          type: integer
+          minimum: 1
+          maximum: 30
+          description: Height of the tree in meters
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=30"
+      required:
+        - x
+        - y
+        - height
+    AddTreeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the added tree
+    EstateStats:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Total number of trees in the estate
+        max:
+          type: integer
+          description: Maximum height of the trees
+        min:
+          type: integer
+          description: Minimum height of the trees
+        median:
+          type: integer
+          description: Median height of the trees
+    DronePlanResponse:
+      type: object
+      properties:
+        distance:
+          type: integer
+          description: Total distance the drone will travel in meters
+        rest:
+          type: object
+          properties:
+            x:
+              type: integer
+              description: X coordinate of the landing point
+            y:
+              type: integer
+              description: Y coordinate of the landing point
+          description: Landing point if max_distance is provided
