@@ -181,6 +181,7 @@ components:
       properties:
         count:
           type: integer
+          format: int64
           description: Total number of trees in the estate
         max:
           type: integer
@@ -196,6 +197,7 @@ components:
       properties:
         distance:
           type: integer
+          format: int64
           description: Total distance the drone will travel in meters
         rest:
           type: object

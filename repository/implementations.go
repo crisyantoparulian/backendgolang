@@ -8,8 +8,14 @@ import (
 	"net/http"
 
 	apperror "github.com/SawitProRecruitment/UserService/utils/app_error"
-	"github.com/SawitProRecruitment/UserService/utils/array"
 	"github.com/google/uuid"
+)
+
+type Relation string
+
+const (
+	RELATION_STATS Relation = "stats"
+	RELATION_TREES Relation = "trees"
 )
 
 func (r *Repository) CreateEstate(ctx context.Context, input CreateEstateInput) (err error) {
@@ -21,12 +27,46 @@ func (r *Repository) CreateEstate(ctx context.Context, input CreateEstateInput) 
 	return
 }
 
+func (r *Repository) GetEstateWithAllDetails(ctx context.Context, id uuid.UUID, exludeRelations ...Relation) (estate *Estate, err error) {
+	estate, err = r.getEstateByIdSql(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = apperror.WrapWithCode(fmt.Errorf("estate with ID %s not found", id), http.StatusNotFound)
+			return nil, err
+		}
+		err = apperror.WrapWithCode(fmt.Errorf("failed to get estate: %w", err), http.StatusInternalServerError)
+		return nil, err
+	}
+
+	// Convert exludeRelations slice to a map for quick lookup
+	excludeMap := make(map[Relation]bool)
+	for _, relation := range exludeRelations {
+		excludeMap[relation] = true
+	}
+
+	if !excludeMap[RELATION_TREES] {
+		estate.Trees, err = r.getTreesByEstateId(ctx, id)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, apperror.WrapWithCode(fmt.Errorf("failed to get estate tress: %w", err), http.StatusInternalServerError)
+		}
+	}
+
+	if !excludeMap[RELATION_STATS] {
+		estate.Stats, err = r.getEstateStatsSQL(ctx, estate.Id)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, apperror.WrapWithCode(fmt.Errorf("failed to get estate stats: %w", err), http.StatusInternalServerError)
+		}
+	}
+
+	return estate, nil
+}
+
 func (r *Repository) CreateTree(ctx context.Context, input CreateTreeInput) (err error) {
 
 	estate, err := r.getEstateByIdSql(ctx, input.EstateId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return apperror.WrapWithCode(fmt.Errorf("estate with ID %s not found", input.Id), http.StatusNotFound)
+			return apperror.WrapWithCode(fmt.Errorf("estate with ID %s not found", input.EstateId), http.StatusNotFound)
 		}
 		return apperror.WrapWithCode(fmt.Errorf("failed to get estate: %w", err), http.StatusInternalServerError)
 	}
@@ -60,60 +100,20 @@ func (r *Repository) CreateTree(ctx context.Context, input CreateTreeInput) (err
 	return
 }
 
-func (r *Repository) GetStatsEstate(ctx context.Context, estateID uuid.UUID) (stats GetStatsEstateOutput, err error) {
-
-	// check estate exist
-	_, err = r.getEstateByIdSql(ctx, estateID)
+func (r *Repository) GetCalculatedEstateStats(ctx context.Context, estateId uuid.UUID) (stats *EstateStats, err error) {
+	stats, err = r.getCalculatedEstateStatsSQL(ctx, estateId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = apperror.WrapWithCode(fmt.Errorf("estate with ID %s not found", estateID), http.StatusNotFound)
-			return
-		}
-		err = apperror.WrapWithCode(fmt.Errorf("failed to get estate: %w", err), http.StatusInternalServerError)
+		err = apperror.WrapWithCode(fmt.Errorf("failed to get calculated stats: %w", err), http.StatusInternalServerError)
 		return
 	}
-
-	heights, err := r.getAllTreeHeightEstateSql(ctx, estateID)
-	if err != nil {
-		err = apperror.WrapWithCode(fmt.Errorf("failed to get all tree height: %w", err), http.StatusInternalServerError)
-		return
-	}
-
-	// if there's no tree, then return all default value 0
-	if len(heights) == 0 {
-		return
-	}
-
-	// Calculate statistic
-	count := len(heights)
-	max := heights[count-1]
-	min := heights[0]
-	median := array.CalculateMedian(heights)
-
-	return GetStatsEstateOutput{
-		Count:  count,
-		Max:    max,
-		Min:    min,
-		Median: median,
-	}, nil
+	return
 }
 
-func (r *Repository) GetEstateByIdWithTrees(ctx context.Context, estateID uuid.UUID) (*Estate, error) {
-
-	// get estate
-	estate, err := r.getEstateByIdSql(ctx, estateID)
+func (r *Repository) UpsertEstateStats(ctx context.Context, estateID uuid.UUID, stats *EstateStats) error {
+	err := r.upsertEstateStatsSQL(ctx, estateID, stats)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, apperror.WrapWithCode(fmt.Errorf("estate with ID %s not found", estateID), http.StatusNotFound)
-		}
-		return nil, apperror.WrapWithCode(fmt.Errorf("failed to get estate: %w", err), http.StatusInternalServerError)
+		return apperror.WrapWithCode(fmt.Errorf("failed to get upsert stats: %w", err), http.StatusInternalServerError)
 	}
 
-	// get all tree in estate
-	estate.Trees, err = r.getTreesByEstateId(ctx, estateID)
-	if err != nil {
-		return nil, apperror.WrapWithCode(fmt.Errorf("failed to get tress: %w", err), http.StatusInternalServerError)
-	}
-
-	return estate, nil
+	return nil
 }

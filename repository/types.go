@@ -1,9 +1,7 @@
-// This file contains types that are used in the repository layer.
+// This file contains types that are used in the repository layer. for  INPUT - OUTPUT
 package repository
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 )
 
@@ -34,21 +32,7 @@ type CheckExistEstateTreeInput struct {
 	Y        int
 }
 
-type Estate struct {
-	Id        uuid.UUID
-	Width     int
-	Length    int
-	CreatedAt time.Time
-	UpdatedAt *time.Time
-	Trees     []Tree
-}
-
-type Tree struct {
-	Id        uuid.UUID
-	EstateId  uuid.UUID
-	X         int
-	Y         int
-	Height    int
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+type UpdateEstateInput struct {
+	Id            uuid.UUID
+	DroneDistance int
 }

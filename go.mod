@@ -5,6 +5,7 @@ go 1.22
 toolchain go1.22.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/getkin/kin-openapi v0.117.0
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/google/uuid v1.5.0
@@ -14,6 +15,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.5.0
+	golang.org/x/sync v0.10.0
 )
 
 require (

@@ -8,6 +8,9 @@ import (
 	"github.com/SawitProRecruitment/UserService/repository"
 	apperror "github.com/SawitProRecruitment/UserService/utils/app_error"
 	httphelper "github.com/SawitProRecruitment/UserService/utils/http_helper"
+	"github.com/SawitProRecruitment/UserService/utils/ptr"
+	utilvalidator "github.com/SawitProRecruitment/UserService/utils/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -25,8 +28,12 @@ func (s *Server) PostEstate(c echo.Context) error {
 	}
 
 	// Validate payload
-	if err := s.validatePayload(c, payload); err != nil {
-		return err
+	if err := s.Validator.Struct(payload); err != nil {
+		validationErrors := err.(validator.ValidationErrors)
+		return c.JSON(http.StatusBadRequest, httphelper.ErrorResponse{
+			Message: "Validation failed",
+			Errors:  utilvalidator.FormatValidationErrors(validationErrors),
+		})
 	}
 
 	estateID := uuid.New()
@@ -52,19 +59,41 @@ func (s *Server) GetEstateIdDronePlan(c echo.Context, id openapi_types.UUID, par
 	ctx := c.Request().Context()
 
 	// Validate payload
-	if err := s.validatePayload(c, params); err != nil {
-		return err
+	if err := s.Validator.Struct(params); err != nil {
+		validationErrors := err.(validator.ValidationErrors)
+		return c.JSON(http.StatusBadRequest, httphelper.ErrorResponse{
+			Message: "Validation failed",
+			Errors:  utilvalidator.FormatValidationErrors(validationErrors),
+		})
 	}
 
-	estate, err := s.Repository.GetEstateByIdWithTrees(ctx, id)
+	estate, err := s.Repository.GetEstateWithAllDetails(ctx, id)
 	if err != nil {
 		return httphelper.HttpRespError(c, err)
 	}
 
-	distance := CalculateDroneDistance(estate)
+	var (
+		droneRest *Coordinate
+		distance  int64
+	)
+
+	// currently if param max_distance is not provided,
+	// we can directly get it from estate_stats table (pre calculate on create tree)
+	// else must calculate it manually
+	if params.MaxDistance == nil {
+		distance = estate.Stats.DroneDistance
+	} else {
+		distance, droneRest = calculateDroneDistance(estate, params.MaxDistance)
+	}
 
 	var resp generated.DronePlanResponse
 	resp.Distance = &distance
+	if droneRest != nil {
+		resp.Rest = &struct {
+			X *int "json:\"x,omitempty\""
+			Y *int "json:\"y,omitempty\""
+		}{X: &droneRest.X, Y: &droneRest.Y}
+	}
 
 	return c.JSON(http.StatusOK, resp)
 }
@@ -75,16 +104,16 @@ func (s *Server) GetEstateIdStats(c echo.Context, id openapi_types.UUID) error {
 	ctx := c.Request().Context()
 
 	var resp generated.EstateStats
-	result, err := s.Repository.GetStatsEstate(ctx, id)
+	result, err := s.Repository.GetEstateWithAllDetails(ctx, id, repository.RELATION_TREES)
 	if err != nil {
 		return httphelper.HttpRespError(c, err)
 	}
 
 	resp = generated.EstateStats{
-		Count:  &result.Count,
-		Max:    &result.Max,
-		Median: &result.Median,
-		Min:    &result.Min,
+		Count:  ptr.ToPointer[int64](result.Stats.TreeCount),
+		Max:    ptr.ToPointer[int](result.Stats.MaxHeight),
+		Median: ptr.ToPointer[int](result.Stats.MedianHeight),
+		Min:    ptr.ToPointer[int](result.Stats.MinHeight),
 	}
 
 	return c.JSON(http.StatusOK, resp)
@@ -103,10 +132,15 @@ func (s *Server) PostEstateIdTree(c echo.Context, id openapi_types.UUID) error {
 	}
 
 	// Validate payload
-	if err := s.validatePayload(c, payload); err != nil {
-		return err
+	if err := s.Validator.Struct(payload); err != nil {
+		validationErrors := err.(validator.ValidationErrors)
+		return c.JSON(http.StatusBadRequest, httphelper.ErrorResponse{
+			Message: "Validation failed",
+			Errors:  utilvalidator.FormatValidationErrors(validationErrors),
+		})
 	}
 
+	// #1. Insert the tree to DB
 	treeId := uuid.New()
 	err := s.Repository.CreateTree(ctx, repository.CreateTreeInput{
 		Id:       treeId,
@@ -119,6 +153,12 @@ func (s *Server) PostEstateIdTree(c echo.Context, id openapi_types.UUID) error {
 		return httphelper.HttpRespError(c, err)
 	}
 
+	// #2. Calculated the stats
+	if err = s.calculateStats(ctx, id); err != nil {
+		return httphelper.HttpRespError(c, err)
+	}
+
+	// #3 return response
 	var resp generated.CreateEstateResponse
 	openapiUUID := openapi_types.UUID(treeId)
 	resp.Id = &openapiUUID

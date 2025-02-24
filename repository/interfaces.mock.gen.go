@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	uuid "github.com/google/uuid"
-	types "github.com/oapi-codegen/runtime/types"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -70,32 +69,51 @@ func (mr *MockRepositoryInterfaceMockRecorder) CreateTree(ctx, input any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTree", reflect.TypeOf((*MockRepositoryInterface)(nil).CreateTree), ctx, input)
 }
 
-// GetEstateByIdWithTrees mocks base method.
-func (m *MockRepositoryInterface) GetEstateByIdWithTrees(ctx context.Context, estateID uuid.UUID) (*Estate, error) {
+// GetCalculatedEstateStats mocks base method.
+func (m *MockRepositoryInterface) GetCalculatedEstateStats(ctx context.Context, estateId uuid.UUID) (*EstateStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEstateByIdWithTrees", ctx, estateID)
+	ret := m.ctrl.Call(m, "GetCalculatedEstateStats", ctx, estateId)
+	ret0, _ := ret[0].(*EstateStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCalculatedEstateStats indicates an expected call of GetCalculatedEstateStats.
+func (mr *MockRepositoryInterfaceMockRecorder) GetCalculatedEstateStats(ctx, estateId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCalculatedEstateStats", reflect.TypeOf((*MockRepositoryInterface)(nil).GetCalculatedEstateStats), ctx, estateId)
+}
+
+// GetEstateWithAllDetails mocks base method.
+func (m *MockRepositoryInterface) GetEstateWithAllDetails(ctx context.Context, id uuid.UUID, exludeRelations ...Relation) (*Estate, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, id}
+	for _, a := range exludeRelations {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetEstateWithAllDetails", varargs...)
 	ret0, _ := ret[0].(*Estate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetEstateByIdWithTrees indicates an expected call of GetEstateByIdWithTrees.
-func (mr *MockRepositoryInterfaceMockRecorder) GetEstateByIdWithTrees(ctx, estateID any) *gomock.Call {
+// GetEstateWithAllDetails indicates an expected call of GetEstateWithAllDetails.
+func (mr *MockRepositoryInterfaceMockRecorder) GetEstateWithAllDetails(ctx, id any, exludeRelations ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEstateByIdWithTrees", reflect.TypeOf((*MockRepositoryInterface)(nil).GetEstateByIdWithTrees), ctx, estateID)
+	varargs := append([]any{ctx, id}, exludeRelations...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEstateWithAllDetails", reflect.TypeOf((*MockRepositoryInterface)(nil).GetEstateWithAllDetails), varargs...)
 }
 
-// GetStatsEstate mocks base method.
-func (m *MockRepositoryInterface) GetStatsEstate(ctx context.Context, estateID types.UUID) (GetStatsEstateOutput, error) {
+// UpsertEstateStats mocks base method.
+func (m *MockRepositoryInterface) UpsertEstateStats(ctx context.Context, estateID uuid.UUID, stats *EstateStats) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStatsEstate", ctx, estateID)
-	ret0, _ := ret[0].(GetStatsEstateOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "UpsertEstateStats", ctx, estateID, stats)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// GetStatsEstate indicates an expected call of GetStatsEstate.
-func (mr *MockRepositoryInterfaceMockRecorder) GetStatsEstate(ctx, estateID any) *gomock.Call {
+// UpsertEstateStats indicates an expected call of UpsertEstateStats.
+func (mr *MockRepositoryInterfaceMockRecorder) UpsertEstateStats(ctx, estateID, stats any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatsEstate", reflect.TypeOf((*MockRepositoryInterface)(nil).GetStatsEstate), ctx, estateID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertEstateStats", reflect.TypeOf((*MockRepositoryInterface)(nil).UpsertEstateStats), ctx, estateID, stats)
 }

@@ -8,13 +8,12 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 type RepositoryInterface interface {
 	CreateEstate(ctx context.Context, input CreateEstateInput) (err error)
-
 	CreateTree(ctx context.Context, input CreateTreeInput) (err error)
-	GetStatsEstate(ctx context.Context, estateID openapi_types.UUID) (stats GetStatsEstateOutput, err error)
-	GetEstateByIdWithTrees(ctx context.Context, estateID uuid.UUID) (*Estate, error)
+	GetEstateWithAllDetails(ctx context.Context, id uuid.UUID, exludeRelations ...Relation) (estate *Estate, err error)
+	GetCalculatedEstateStats(ctx context.Context, estateId uuid.UUID) (stats *EstateStats, err error)
+	UpsertEstateStats(ctx context.Context, estateID uuid.UUID, stats *EstateStats) error
 }

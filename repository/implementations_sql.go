@@ -10,7 +10,6 @@ import (
 )
 
 func (r *Repository) createTreeSQL(ctx context.Context, input CreateTreeInput) (err error) {
-	// Insert data pohon ke database
 	res, err := r.Db.ExecContext(ctx, `
 		INSERT INTO trees (id, estate_id, x, y, height) 
 		VALUES ($1, $2, $3, $4, $5);`,
@@ -19,7 +18,6 @@ func (r *Repository) createTreeSQL(ctx context.Context, input CreateTreeInput) (
 		return err
 	}
 
-	// Cek apakah data berhasil dimasukkan
 	rowAffected, err := res.RowsAffected()
 	if err != nil {
 		return err
@@ -120,7 +118,7 @@ func (r *Repository) getTreesByEstateId(ctx context.Context, estateID uuid.UUID)
 		WHERE estate_id = $1;`
 	rows, err := r.Db.QueryContext(ctx, queryTrees, estateID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query trees: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -147,4 +145,76 @@ func (r *Repository) getTreesByEstateId(ctx context.Context, estateID uuid.UUID)
 	}
 
 	return trees, nil
+}
+
+func (r *Repository) getCalculatedEstateStatsSQL(ctx context.Context, estateId uuid.UUID) (stats *EstateStats, err error) {
+	stats = &EstateStats{}
+	query := `
+		SELECT
+			COUNT(*) AS tree_count,
+			COALESCE(MAX(height), 0) AS max_height,
+			COALESCE(MIN(height), 0) AS min_height,
+			COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY height)), 0) AS median_height
+		FROM trees
+		WHERE estate_id = $1;`
+	err = r.Db.QueryRowContext(ctx, query, estateId).Scan(
+		&stats.TreeCount,
+		&stats.MaxHeight,
+		&stats.MinHeight,
+		&stats.MedianHeight,
+	)
+	return
+}
+
+func (r *Repository) getEstateStatsSQL(ctx context.Context, estateId uuid.UUID) (stats *EstateStats, err error) {
+	stats = &EstateStats{}
+	query := `
+		SELECT id, estate_id, tree_count, max_height, min_height, median_height,drone_distance, created_at, updated_at
+		FROM estate_stats
+		WHERE estate_id = $1;`
+	err = r.Db.QueryRowContext(ctx, query, estateId).Scan(
+		&stats.Id,
+		&stats.EstateID,
+		&stats.TreeCount,
+		&stats.MaxHeight,
+		&stats.MinHeight,
+		&stats.MedianHeight,
+		&stats.DroneDistance,
+		&stats.CreatedAt,
+		&stats.UpdatedAt,
+	)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (r *Repository) upsertEstateStatsSQL(ctx context.Context, estateID uuid.UUID, stats *EstateStats) error {
+	// Query untuk menyimpan atau memperbarui statistik
+	query := `
+		INSERT INTO estate_stats (id, estate_id, tree_count, max_height, min_height, median_height, drone_distance)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (estate_id) DO UPDATE
+		SET
+			tree_count = EXCLUDED.tree_count,
+			max_height = EXCLUDED.max_height,
+			min_height = EXCLUDED.min_height,
+			median_height = EXCLUDED.median_height,
+			drone_distance = EXCLUDED.drone_distance,
+			updated_at = CURRENT_TIMESTAMP;`
+	_, err := r.Db.ExecContext(ctx, query,
+		stats.Id,
+		estateID,
+		stats.TreeCount,
+		stats.MaxHeight,
+		stats.MinHeight,
+		stats.MedianHeight,
+		stats.DroneDistance,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
